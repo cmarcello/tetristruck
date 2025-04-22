@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TetrisTruckPro 🚛</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #eee;
+      text-align: center;
+      margin: 0;
+      padding: 1em;
+    }
+
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(3, 60px);  /* Changed from 45px to 60px */
+      grid-template-rows: repeat(7, 70px);
+      gap: 4px;
+      margin: auto;
+      background: #444;
+      padding: 5px;
+      border-radius: 10px;
+      margin-bottom: 1em;
+    }
+
+    .cell {
+      width: 60px;
+      height: auto;  /* Cambiato da 70px a auto */
+      min-height: 70px;  /* Aggiunta altezza minima */
+      background: #ddd;
+      border: 1px solid #999;
+      position: relative;
+      display: flex;  /* Aggiunto per centrare il contenuto */
+      align-items: center;  /* Aggiunto per centrare il contenuto */
+      justify-content: center;  /* Aggiunto per centrare il contenuto */
+    }
+
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(3, 60px);
+      grid-auto-rows: minmax(70px, auto);  /* Modificato per supportare altezze variabili */
+      gap: 4px;
+      margin: auto;
+      background: #444;
+      padding: 5px;
+      border-radius: 10px;
+      margin-bottom: 1em;
+    }
+
+    #cargo-area {
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: 10px;
+      position: absolute;
+      left: calc(100% + 20px);
+      top: 0;
+      width: auto;
+      height: 100%;
+      align-content: start;
+    }
+
+    .cargo {
+      width: 60px;
+      height: auto;
+      background-color: #88ff88;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 8px;
+      min-width: 70px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      transition: all 0.1s ease;
+      padding: 10px 5px;
+      margin-bottom: 10px;
+    }
+
+    .cargo:active {
+      transform: scale(0.95);  /* Effetto di pressione */
+    }
+
+    .selected {
+      outline: 3px solid red;  /* Aumentato spessore outline */
+      outline-offset: 2px;  /* Aggiunto spazio tra outline e cargo */
+    }
+
+    .oscillate {
+      animation: shake 0.4s infinite;
+    }
+
+    @keyframes shake {
+      0% { transform: translateX(0); }
+      25% { transform: translateX(2px); }
+      50% { transform: translateX(-2px); }
+      75% { transform: translateX(1px); }
+      100% { transform: translateX(0); }
+    }
+  
+    #center-of-mass-indicator {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background-color: red;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 1000;
+      box-shadow: 0 0 10px rgba(255,0,0,0.5);
+      border: 2px solid white;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.2); opacity: 0.8; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .center-line {
+      position: absolute;
+      width: 2px;
+      background-color: rgba(255,0,0,0.3);
+      top: 0;
+      bottom: 0;
+      pointer-events: none;
+      transition: left 0.3s ease;
+    }
+
+    #truck-header {
+      width: 190px;  /* Larghezza uguale alla griglia (3 * 60px + 2 * 4px gap + 2 * 5px padding) */
+      margin: 0 auto 5px auto;
+    }
+
+    #grid-wrapper {
+      position: relative;
+      display: inline-block;
+      padding-bottom: 40px;
+      margin-right: 250px;  /* Spazio per l'area dei carichi */
+    }
+
+    @media (max-width: 768px) {
+      #cargo-area {
+        position: static;
+        margin-top: 20px;
+        width: 100%;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 5px;
+      }
+
+      #grid-wrapper {
+        margin-right: 0;
+      }
+
+      .cargo {
+        min-width: auto;
+        width: 100%;
+        font-size: 12px;
+        padding: 5px 2px;
+      }
+    }
+
+    @media (min-width: 769px) {
+      #cargo-area {
+        display: grid;
+        grid-template-columns: repeat(3, auto);
+        gap: 10px;
+        position: absolute;
+        left: calc(100% + 10px);  /* Ridotto da 20px a 10px */
+        top: 0;
+        width: auto;
+        height: 100%;
+        align-content: start;
+      }
+
+      #grid-wrapper {
+        margin-right: 200px;  /* Ridotto da 250px a 200px */
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>TetrisTruckPro 🚛</h1>
+  <div style="position: relative; display: inline-block;">
+    <div id="grid-wrapper">
+      <div id="truck-header">
+        <img src="headtruck.png" alt="Testa del camion" style="width: 100%; height: auto; display: block; margin-bottom: 5px;">
+      </div>
+      <div id="grid"></div>
+      <div id="center-of-mass-indicator"></div>
+      <div style="position: relative; margin-top: 20px; height: 60px;">
+        <div id="velocity-display" style="position: absolute; top: 0; width: 100%; text-align: center; font-weight: bold;">Velocità: 20 km/h</div>
+        <div id="center-of-mass-label" style="position: absolute; top: 25px; width: 100%; text-align: center;">Baricentro:</div>
+      </div>
+    </div>
+    <div id="cargo-area"></div>
+  </div>
+  
+  <div style="margin: 10px 0;">
+    <label for="speedInput"><strong>Velocità camion (km/h):</strong></label>
+    <input type="number" id="speedInput" value="20" min="5" max="120" step="5" />
+  </div>
+
+  <button onclick="resetGame()">Reset</button>
+  <button id="stopBtn" onclick="stopSimulation()" style="display:none;">Interrompi Simulazione</button>
+  <button onclick="simulate()">Avvia Simulazione</button>
+  <button onclick="window.location.href='help.html'" style="margin-left: 10px; background-color: #4CAF50; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer;">Aiuto</button>
+
+  <script>
+
+  let simulationInterval;
+
+  
+  function resetGame() {
+    clearInterval(simulationInterval);
+    document.getElementById("stopBtn").style.display = "none";
+    document.getElementById("center-of-mass-indicator").style.left = '-9999px';
+    document.getElementById("center-of-mass-label").textContent = "Baricentro:";
+    document.getElementById("grid").style.transform = "rotate(0deg)";
+
+    // Svuota celle
+    document.querySelectorAll('.cell').forEach(cell => {
+      cell.innerHTML = '';
+    });
+
+    // Rimuove carichi
+    document.getElementById("cargo-area").innerHTML = '';
+
+    // Ricrea i carichi
+    for (let i = 0; i < 15; i++) {
+      const div = document.createElement("div");
+      div.className = "cargo";
+      const weight = [1, 3, 5][Math.floor(Math.random() * 3)];
+      const height = [1, 2, 3][Math.floor(Math.random() * 3)];
+      div.dataset.weight = weight;
+      div.dataset.height = height;
+      div.textContent = height + "m / " + weight + "t";
+      div.style.backgroundColor =
+        weight === 5 ? "#ff8888" : weight === 3 ? "#fff066" : "#88ff88";
+      div.onclick = () => {
+        if (selected === div) {
+          selected = null;
+          div.classList.remove("selected");
+        } else {
+          document.querySelectorAll(".cargo").forEach(e => e.classList.remove("selected"));
+          selected = div;
+          div.classList.add("selected");
+        }
+      };
+      document.getElementById("cargo-area").appendChild(div);
+    }
+  }
+
+  function stopSimulation() {
+    clearInterval(simulationInterval);
+    document.getElementById("stopBtn").style.display = "none";
+  }
+
+    const grid = document.getElementById("grid");
+    const cargoArea = document.getElementById("cargo-area");
+    let selected = null;
+
+    for (let r = 0; r < 7; r++) {
+      for (let c = 0; c < 3; c++) {
+        const index = r * 3 + c;
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.dataset.index = index;
+        cell.onclick = () => {
+          if (selected && !cell.firstChild) {
+            cell.appendChild(selected);
+            selected = null;
+          } else if (cell.firstChild) {
+            cargoArea.appendChild(cell.firstChild);
+          }
+        };
+        grid.appendChild(cell);
+      }
+    }
+
+    // Genera 15 carichi
+    for (let i = 0; i < 15; i++) {
+      const div = document.createElement("div");
+      div.className = "cargo";
+      const weight = [1, 3, 5][Math.floor(Math.random() * 3)];
+      const height = [1, 2, 3][Math.floor(Math.random() * 3)];
+      div.dataset.weight = weight;
+      div.dataset.height = height;
+      div.textContent = height + "m / " + weight + "t";
+      div.style.backgroundColor =
+        weight === 5 ? "#ff8888" : weight === 3 ? "#fff066" : "#88ff88";
+      div.style.height = (height * 35) + "px";  // Altezza proporzionale
+      div.style.minHeight = (height * 35) + "px";  // Minima altezza proporzionale
+      div.onclick = () => {
+        if (selected === div) {
+          selected = null;
+          div.classList.remove("selected");
+        } else {
+          document.querySelectorAll(".cargo").forEach(e => e.classList.remove("selected"));
+          selected = div;
+          div.classList.add("selected");
+        }
+      };
+      document.getElementById("cargo-area").appendChild(div);
+    }
+
+    // Aggiungi questa riga dopo la creazione del grid-wrapper
+    const centerLine = document.createElement('div');
+    centerLine.className = 'center-line';
+    document.getElementById('grid-wrapper').appendChild(centerLine);
+
+    function simulate() {
+      let curveNumber = 0;
+      const totalCurves = 20;
+      
+      let baseSpeed = parseFloat(document.getElementById("speedInput").value);
+      let currentSpeed = baseSpeed;
+      document.getElementById("velocity-display").textContent = "Velocità: " + currentSpeed + " km/h";
+  
+      simulationInterval = setInterval(() => {
+        if (curveNumber >= totalCurves) {
+          clearInterval(simulationInterval);
+          document.getElementById("stopBtn").style.display = "none";
+          return;
+        }
+  
+        // Calcola l'incremento necessario per raggiungere 120 km/h
+        const remainingCurves = totalCurves - curveNumber;
+        if (currentSpeed < 120 && remainingCurves > 0) {
+          const speedIncrement = Math.min(
+            (120 - currentSpeed) / remainingCurves,
+            10
+          );
+          currentSpeed = Math.min(120, currentSpeed + speedIncrement);
+          document.getElementById("velocity-display").textContent = "Velocità: " + Math.round(currentSpeed) + " km/h";
+        }
+  
+        const isRight = curveNumber % 2 === 0;
+        document.getElementById('grid').style.transform = `rotate(${isRight ? 2 : -2}deg)`;
+        setTimeout(() => {
+          document.getElementById('grid').style.transform = 'rotate(0deg)';
+        }, 400);
+  
+        // simulazione oscillazione e baricentro
+        let totalMass = 0;
+        let totalPos = 0;
+        document.querySelectorAll(".cell").forEach((cell, index) => {
+          if (cell.firstChild) {
+            const cargo = cell.firstChild;
+            const weight = parseFloat(cargo.dataset.weight);
+            const col = index % 3;
+            totalMass += weight;
+            totalPos += weight * col;
+  
+            const mass = weight * 1000; // kg
+            const velocity = currentSpeed / 3.6; // m/s
+            const radius = 50; // metri
+            const g = 9.81; // accelerazione di gravità
+            const h = parseFloat(cargo.dataset.height); // altezza in metri
+            
+            // Calcolo forza centrifuga più accurato
+            const forceCentrifuga = mass * (velocity * velocity) / radius;
+            
+            // Momento ribaltante dovuto alla forza centrifuga
+            const momentoRibaltante = forceCentrifuga * h;
+            
+            // Momento stabilizzante dovuto al peso
+            const momentoStabilizzante = mass * g * (1.2 - Math.abs(col - 1)) / 2;
+            
+            // Coefficiente di sicurezza
+            const coefficienteSicurezza = momentoStabilizzante / momentoRibaltante;
+            
+            let label = cargo.querySelector('.risk-label');
+            if (!label) {
+              label = document.createElement('div');
+              label.className = 'risk-label';
+              label.style.fontSize = '9px';
+              label.style.color = '#333';
+              label.style.textAlign = 'center';
+              label.style.marginTop = '2px';
+              cargo.appendChild(label);
+            }
+            label.textContent = coefficienteSicurezza.toFixed(2) + " CS";
+  
+            // Se il coefficiente di sicurezza è troppo basso, il carico si ribalta
+            if (coefficienteSicurezza < 1.0) {
+              cargo.style.transform = "rotate(90deg)";
+              cargo.style.backgroundColor = "red";
+            } else if (coefficienteSicurezza < 1.5) {
+              cargo.classList.add("oscillate");
+              setTimeout(() => cargo.classList.remove("oscillate"), 500);
+            }
+          }
+        });
+  
+        const gridRect = document.getElementById('grid').getBoundingClientRect();
+        const gridWrapperRect = document.getElementById('grid-wrapper').getBoundingClientRect();
+        
+        // Nascondi l'indicatore se non ci sono carichi
+        if (totalMass === 0) {
+            document.getElementById('center-of-mass-indicator').style.display = 'none';
+            centerLine.style.display = 'none';
+            document.getElementById('center-of-mass-label').textContent = "Baricentro: nessun carico";
+            return;
+        }
+        
+        // Mostra l'indicatore se ci sono carichi
+        document.getElementById('center-of-mass-indicator').style.display = 'block';
+        centerLine.style.display = 'block';
+        
+        const center = totalPos / totalMass;
+        const indicator = document.getElementById('center-of-mass-indicator');
+        
+        // Calcolo della posizione del baricentro relativa al grid-wrapper
+        const cellWidth = 60;
+        const gap = 4;
+        const padding = 5;
+        
+        // Calcolo posizione relativa al grid-wrapper invece che alla finestra
+        const relativeLeft = (center * (cellWidth + gap)) + (cellWidth / 2) + padding;
+        
+        // Aggiornamento posizione indicatore e linea
+        indicator.style.left = relativeLeft - 10 + 'px';
+        indicator.style.top = gridRect.height - 10 + 'px';
+        
+        // Aggiornamento linea centrale
+        centerLine.style.left = relativeLeft + 'px';
+        centerLine.style.top = '0px';
+        centerLine.style.height = gridRect.height + 'px';
+        
+        document.getElementById('center-of-mass-label').textContent =
+          "Baricentro: colonna " + center.toFixed(2);
+  
+        curveNumber++;
+      }, 800);
+  
+      document.getElementById("stopBtn").style.display = "inline-block";
+    }
+  </script>
+</body>
+</html>
